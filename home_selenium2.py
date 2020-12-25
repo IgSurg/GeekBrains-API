@@ -134,11 +134,11 @@ def read_all_mails(driver):
             break
         end_link = x
         count +=1
-#        if count > 3: break
+#        if count > 5: break
 
-    unique_link = list(set(link))    ##  ??????????? дурдом
+    unique_links = list(set(links))    ##  ??????????? дурдом
     mails = []
-    for link in unique_link:
+    for link in unique_links:
         mail = get_mail_text(link, driver)
         if mail is not None:
             mails.append(mail)
