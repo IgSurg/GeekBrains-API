@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from pprint import pprint
 import time
+import json
 from datetime import datetime
 from pymongo import MongoClient
 from sys import platform
@@ -18,6 +19,13 @@ if platform == "win32":
 
 import requests
 import json
+
+# 1
+#Написать программу, которая собирает входящие письма из своего или тестового почтового ящика и сложить данные о письмах
+# в базу данных (от кого, дата отправки, тема письма, текст письма полный)
+#Логин тестового ящика: study.ai_172@mail.ru
+#Пароль тестового ящика: NextPassword172
+#
 #--------------------------------------------------------------------------------
 
 def get_mail_text(link, driver):
@@ -206,11 +214,87 @@ def XHR():
         dom = None
     return dom
 
+############################################################################################
+########################### M - Video ######################################################
+############################################################################################
+#-----------------------------------------------------------------------------------------------
 
+
+def get_mvideo_driver(link):
+    chrome_options = Options()
+    chrome_options.add_argument('start-maximized')
+    driver = webdriver.Chrome(executable_path='./chromedriver.exe', options=chrome_options)
+
+    driver.get(link)
+    return driver
+
+def get_mvideo_hit_driver(driver):
+
+    try:
+        hits = driver.find_elements_by_xpath('//div[@class="section"]')
+    except Exception as e:
+        print('Хитов нет', e)
+        return None
+    count = 0
+    for hit in hits:
+        try:
+            dr = hit.find_elements_by_xpath('.//div[contains(text(),"Хиты продаж")]')
+            if dr:
+                hit_sales = hit
+                return hit_sales
+            else:
+                hit_sales = None
+        except Exception as e:
+            pass
+        count +=1
+
+    return hit_sales
+
+#-----------------------------------------------------------------------------------------------
+
+
+def get_list_hit_sale(hit_sale):
+
+    items = []
+
+# читаем первую позицию в хитах продаж
+    i = 0
+    while True:
+        try:
+            hits = hit_sale.find_elements_by_xpath(".//a[contains(@class,'fl-product-tile-picture fl-product-tile-picture__link')]")
+            for hit in hits:
+                x = hit.get_attribute('data-product-info')
+                x = x.replace('\t', '')
+                x = x.replace('\n', '')
+                x = json.loads(x)
+                x.pop('Location')
+                x.pop('eventPosition')
+                x.pop('productId')
+                x.pop('productCategoryId')
+                x.pop('productGroupId')
+                if i> 0 and x == items[0]: break
+                if x not in items: items.append(x)
+                i += 1
+        except Exception as e:
+            print('фигня какая-то 6:', e)
+        if i > 0 and x == items[0]: break
+
+# нажимаем далее
+
+        try:
+            button = WebDriverWait(hit_sale, 10).until(
+                EC.presence_of_element_located((By.XPATH, './/a[contains(@class,"next-btn")]')))
+            button.click()
+            time.sleep(2)
+        except Exception as e:
+            print('фигня какая-то 7:', e)
+
+    return items
 
 #-----------------------------------------------------------------------------------------------
 
 def main():
+
 
     link = 'https://mail.ru'
     name = 'study.ai_172@mail.ru'
@@ -218,7 +302,6 @@ def main():
 
     dr = register_mailru(link,name,password)
     if dr is not None:
-#        mails = read_mails(dr)
         mails = read_all_mails(dr)
     pprint(mails)
 
@@ -232,8 +315,29 @@ def main():
 # печать результат прохода ------------------
 
 #    XHR()
-#    dr.close()
+##    dr.close()
 
+
+##########################################################################################################
+#Написать программу, которая собирает «Хиты продаж» с сайта техники mvideo и складывает данные в БД. Магазины
+#можно выбрать свои. Главный критерий выбора: динамически загружаемые товары
+
+
+    link = 'https://www.mvideo.ru/'
+    dr = get_mvideo_driver(link)
+    hit_sale = get_mvideo_hit_driver(dr)
+    items = get_list_hit_sale(hit_sale)
+    pprint(items)
+
+    dr.close()
+
+
+# запись в базу -----------------------------
+
+    ip = '127.0.0.1'
+    port = 27017
+    name_db = 'mvideo'
+    write_to_mongo(ip, port, name_db, items)
 
 
 
